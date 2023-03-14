@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VENV_DIR="${HOME}/tensorflow-venv"
+VENV_DIR="${HOME}/tensorflow-venv2"
 
 echo "rm -rf ${VENV_DIR}"
 rm -rf $VENV_DIR
@@ -14,5 +14,5 @@ source $VENV_DIR/bin/activate
 echo "pip3 install --upgrade pip"
 pip3 install --upgrade pip
 
-echo "pip install tensorflow==2.3.2"
-pip install tensorflow==2.3.2
+echo "pip install tensorflow==2.10.1"
+pip install tensorflow==2.10.1

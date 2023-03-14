@@ -19,6 +19,9 @@ ibrun -n 1 -o 3 python3 ip_finder.py >> ${FILE_NAME}
 #ibrun -n 1 -o 5 python3 ip_finder.py >> ${FILE_NAME}
 #ibrun -n 1 -o 6 python3 ip_finder.py >> ${FILE_NAME}
 #ibrun -n 1 -o 7 python3 ip_finder.py >> ${FILE_NAME}
+#ibrun -n 1 -o 8 python3 ip_finder.py >> ${FILE_NAME}
+#ibrun -n 1 -o 9 python3 ip_finder.py >> ${FILE_NAME}
+
 
 WORKER_HOSTS=$(python3 ip_finder_aux.py)
 rm -f ${FILE_NAME}

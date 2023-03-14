@@ -16,14 +16,14 @@ TARGET_DIR="/tmp"
 DATASET="${DATA_DIR}"
  
 for i in {1..1}; do
-#  RUN_DIR="/home/gsd/tensorflow_scripts/scripts/lenet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"
-#  ./train.sh -o -m lenet -b $BATCH_SIZE -e $EPOCHS -g 4 -i autotune -l -v -d "$DATASET" -r $RUN_DIR 
-#  sleep 10
+  RUN_DIR="${TARGET_DIR}/lenet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"
+  ./train.sh -o -m lenet -b $BATCH_SIZE -e $EPOCHS -g 4 -i autotune -l -v -d "$DATASET" -r $RUN_DIR 
+  sleep 10
  #  mv "remora_${SLURM_JOB_ID}"  $RUN_DIR
 
-  RUN_DIR="${TARGET_DIR}/alexnet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"
-  remora ./train.sh -o -m alexnet -b $BATCH_SIZE -e $EPOCHS -g 4 -i autotune -l -v -d "$DATASET" -r $RUN_DIR
-  sleep 10
+#  RUN_DIR="${TARGET_DIR}/alexnet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"
+#  ./train.sh -o -m alexnet -b $BATCH_SIZE -e $EPOCHS -g 4 -i autotune -l -v -d "$DATASET" -r $RUN_DIR
+#  sleep 10
 #  mv "remora_${SLURM_JOB_ID}" $RUN_DIR
 #
 #  RUN_DIR="${TARGET_DIR}/resnet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"

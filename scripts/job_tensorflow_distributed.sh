@@ -3,9 +3,19 @@
 WORKSPACE=$(dirname $(dirname $(realpath $0)))
 DATA_DIR="/scratch1/09111/mbbm"
 
-cd "${WORKSPACE}/scripts"
+#echo -e "cp 100g_tfrecords to /tmp"
+#cp -r /scratch1/09111/mbbm/100g_tfrecords/ /tmp/100g_tfrecords/
 
-EPOCHS=1
+#dd if=/scratch1/09111/mbbm/60g_tfrecords2 of=/dev/shm/60g_tfrecords
+#rsync -av /scratch1/09111/mbbm/100g_tfrecords/ /tmp/100g_tfrecords/
+#rsync -av /scratch1/09111/mbbm/60g_tfrecords/ /tmp/60g_tfrecords/
+#rsync -av /scratch1/09111/mbbm/60g_tfrecords/ /dev/shm/60g_tfrecords/
+
+#DATA_DIR="/tmp"
+#DATA_DIR="/dev/shm"
+#cd "${WORKSPACE}/scripts"
+
+EPOCHS=2
 BATCH_SIZE=1024
 DATE="$(date +%Y_%m_%d-%H_%M)"
 TARGET_DIR="/tmp"
@@ -18,14 +28,18 @@ echo "module load cuda/10.1 cudnn/7.6.5 nccl/2.5.6"
 module load cuda/11.3 cudnn nccl
 #module load remora
 
+
 # 100g
-DATASET="${DATA_DIR}/100g_tfrecords2"
+DATA_DIR="/scratch1/09111/mbbm"
+DATASET="${DATA_DIR}/100g_tfrecords"
+#DATASET="${DATA_DIR}/60g_tfrecords"
+DATASET="/scratch1/09111/mbbm/imagenet/ILSVRC/Data/CLS-LOC/train/"
  
 for i in {1..1}; do
-  RUN_DIR="${DATA_DIR}/lenet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"
- # RUN_DIR="${DATA_DIR}/alexnet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"
+  #RUN_DIR="${TARGET_DIR}/lenet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"
+  RUN_DIR="${TARGET_DIR}/alexnet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"
   #./train_distributed.sh -j $TASK_INDEX -o -m lenet -b $BATCH_SIZE -e $EPOCHS -g 4 -i autotune -l -v -d "$DATASET" -r $RUN_DIR
-  ./train_distributed.sh -j $TASK_INDEX -o -m alexnet -b $BATCH_SIZE -e $EPOCHS -g 4 -i autotune -l -v -d "$DATASET" -r $RUN_DIR
+  ./train_distributed_teste.sh -j $TASK_INDEX -o -m alexnet -b $BATCH_SIZE -e $EPOCHS -g 4 -i autotune -l -v -d "$DATASET" -r $RUN_DIR
   sleep 10
   #mv "remora_${SLURM_JOB_ID}"  $RUN_DIR
 
