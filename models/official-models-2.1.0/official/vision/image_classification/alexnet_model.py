@@ -1,6 +1,12 @@
-from tensorflow.python.keras.models import Sequential
-from tensorflow.python.keras.layers import Dense, Activation, Dropout, Flatten, Conv2D, MaxPooling2D
-from tensorflow.python.keras.layers.normalization import BatchNormalization
+#from tensorflow.python.keras.models import Sequential
+#from tensorflow.python.keras.layers import Dense, Activation, Dropout, Flatten, Conv2D, MaxPooling2D
+#from tensorflow.python.keras.layers.normalization import BatchNormalization
+
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, LSTM, BatchNormalization, Conv2D, Activation, MaxPooling2D, Flatten
+from keras.callbacks import TensorBoard
+from keras.callbacks import ModelCheckpoint
+
 import numpy as np
 np.random.seed(1000)
 

@@ -27,11 +27,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+"""
 from tensorflow.python.keras import backend
 from tensorflow.python.keras import initializers
 from tensorflow.python.keras import layers
 from tensorflow.python.keras import models
 from tensorflow.python.keras import regularizers
+"""
+
+from keras import backend
+from keras import initializers
+from keras import layers
+from keras import models
+from keras import regularizers
+
 from official.vision.image_classification import imagenet_preprocessing
 
 L2_WEIGHT_DECAY = 1e-4

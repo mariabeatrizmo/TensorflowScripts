@@ -35,7 +35,7 @@ from official.vision.image_classification import common
 from official.vision.image_classification import imagenet_preprocessing
 from official.vision.image_classification import resnet_model
 import resource
-
+from keras.optimizers import adam_v2
 
 def run(flags_obj):
   """Run ResNet ImageNet training and eval loop using native Keras APIs.
@@ -180,10 +180,11 @@ def run(flags_obj):
 
     # TODO(b/138957587): Remove when force_v2_in_keras_compile is on longer
     # a valid arg for this model. Also remove as a valid flag.
+    opt = adam_v2.Adam(learning_rate=lr_schedule, decay=lr_schedule/flags_obj.train_epochs)
     if flags_obj.force_v2_in_keras_compile is not None:
       model.compile(
           loss='sparse_categorical_crossentropy',
-          optimizer=optimizer,
+          optimizer=opt, #optimizer,
           metrics=(['sparse_categorical_accuracy']
                    if flags_obj.report_accuracy_metrics else None),
           run_eagerly=flags_obj.run_eagerly,
@@ -191,7 +192,7 @@ def run(flags_obj):
     else:
       model.compile(
           loss='sparse_categorical_crossentropy',
-          optimizer=optimizer,
+          optimizer=opt, #optimizer,
           metrics=(['sparse_categorical_accuracy']
                    if flags_obj.report_accuracy_metrics else None),
           run_eagerly=flags_obj.run_eagerly)

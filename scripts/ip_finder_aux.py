@@ -9,7 +9,7 @@ def ip_finder(line):
    match = re.findall(r'\d\d?\d?\.\d\d?\d?\.\d\d?\d?\.\d\d?\d?:?\d?\d?\d?\d?', line)
    if match:
       for element in match:
-          if found is not 0:
+          if found != 0:
             list = list + ","
           list = list + element
           found+=1

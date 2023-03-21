@@ -56,9 +56,9 @@ function export-vars {
 
 function monitor {
 	# Add monitoring code here (if needed)
-	#return
-        sh $RESOURCES_DIR/iostat-csv.sh > $RUN_DIR/iostat.csv &
-	nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv -l 1 -f /tmp/nvidia-smi_${TASK_INDEX}.csv &
+	return
+        #sh $RESOURCES_DIR/iostat-csv.sh > $RUN_DIR/iostat.csv &
+	#nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv -l 1 -f /tmp/nvidia-smi_${TASK_INDEX}.csv &
 	#if [[ ! -z $COLLECT_IOPS ]]; then
 	#	echo -e "entra COLLECT_IOPS"
 	#	$RESOURCES_DIR/collect_lustre_stats.sh -r 5 -o $RUN_DIR -s llite -f scratch1 > /dev/null &
@@ -87,8 +87,8 @@ function train-model {
 function kill-monitor {
 	echo -e "\nKilling jobs: \n$(jobs -p)"
 	kill $(jobs -p)
-	echo -e $(pgrep iostat)
-	kill $(pgrep iostat)
+	#echo -e $(pgrep iostat)
+	#kill $(pgrep iostat)
 }
 
 function update-prefetch {
@@ -287,8 +287,8 @@ sleep 10
 # Start training the model
 SECONDS=0
 #LD_PRELOAD=/home1/09111/mbbm/sdlprof/build/libprofiler.so train-model
-LD_PRELOAD=/home1/09111/mbbm/monarch/pastor/build/libmonarch.so train-model
-#train-model
+#LD_PRELOAD=/home1/09111/mbbm/monarch/pastor/build/libmonarch.so train-model
+train-model
 echo "ELAPSED TIME: $SECONDS s" | tee -a $RUN_DIR/log.txt 
 sleep 10
 

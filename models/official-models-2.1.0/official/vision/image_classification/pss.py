@@ -22,23 +22,30 @@ from official.vision.image_classification import imagenet_preprocessing
 from official.vision.image_classification import alexnet_model
 from official.vision.image_classification import lenet_model
 from official.vision.image_classification import resnet_model
+from official.vision.image_classification import inception_v4_model
 from keras.optimizers import adam_v2
+from tensorflow.keras.layers import Input
 
 DATASET_DIR='/scratch1/09111/mbbm/100g_tfrecords'
 EPOCHS=2
 BATCH_SIZE=1024
 
-def dataset_fn(_):
+
+def dataset_fn(input_context):
+  global DATASET_DIR, EPOCHS, BATCH_SIZE
   is_training = True
   data_dir = DATASET_DIR
   num_epochs = EPOCHS
   batch_size = BATCH_SIZE
   dtype = tf.float32
   shuffle_buffer = 10000
-
+    
   filenames = imagenet_preprocessing.get_shuffled_filenames(is_training, data_dir, num_epochs)
   dataset = tf.data.Dataset.from_tensor_slices(filenames)
   dataset = dataset.interleave(tf.data.TFRecordDataset, cycle_length=40, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  
+  dataset = dataset.shard(
+    input_context.num_input_pipelines, input_context.input_pipeline_id)
 
   dataset = dataset.shuffle(shuffle_buffer).repeat()
   dataset = dataset.map(
@@ -49,9 +56,12 @@ def dataset_fn(_):
 
   #dist_dataset = parameter_server.experimental_distribute_dataset(dataset)
 
-  options = tf.data.Options()
-  options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
-  dataset = dataset.with_options(options)
+  #options = tf.data.Options()
+  #options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
+  #dataset = dataset.with_options(options)
+  
+  dataset = dataset.shard(
+    input_context.num_input_pipelines, input_context.input_pipeline_id)
 
   return dataset
 
@@ -131,6 +141,7 @@ def configure_cluster(worker_hosts=None, task_index=-1, distribution_strategy="p
   return num_workers
 
 def run(flags_obj):
+  global DATASET_DIR, EPOCHS, BATCH_SIZE
   DATASET_DIR = flags_obj.data_dir
   EPOCHS = flags_obj.train_epochs
   BATCH_SIZE = flags_obj.batch_size
@@ -157,16 +168,26 @@ def run(flags_obj):
   with strategy.scope():
     model = alexnet_model.alexnet()
     #model = lenet_model.lenet()
-    #model = resnet_model.resnet()
+    #model = resnet_model.resnet50(
+    #      num_classes=imagenet_preprocessing.NUM_CLASSES)
     #model = resnet_model.resnet50(num_classes=imagenet_preprocessing.NUM_CLASSES)
-    #model  = tf.keras.applications.resnet.ResNet152(
+    #model = tf.keras.applications.resnet.ResNet152(
 
 
-#    model = tf.keras.applications.InceptionV3()
+    #model = tf.keras.applications.InceptionV3(
+    #model = tf.keras.applications.resnet.ResNet152(
+    #model = tf.keras.applications.ResNet50V2(
+    model = tf.keras.applications.InceptionV3(
+	#include_top=False,
+        weights=None,
+        input_tensor=Input(shape=(224, 224, 3)),
+	classes=imagenet_preprocessing.NUM_CLASSES
+    )
+
+#    model = inception_v4_model.create_model(
 #	include_top=False,
-#        weights=None,
-#	classes=imagenet_preprocessing.NUM_CLASSES
-#    )
+#	num_classes=imagenet_preprocessing.NUM_CLASSES,
+#        weights=None)
 
     optimizer = adam_v2.Adam(learning_rate=lr_schedule, decay=lr_schedule/flags_obj.train_epochs)
     #optimizer = tf.keras.optimizers.legacy.SGD()

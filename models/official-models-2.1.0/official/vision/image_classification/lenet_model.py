@@ -1,8 +1,16 @@
+"""
 from tensorflow.python.keras.layers import Conv2D 
 from tensorflow.python.keras.layers import AveragePooling2D 
 from tensorflow.python.keras.layers import Flatten
 from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras.models import Sequential
+"""
+
+from keras.layers import Conv2D
+from keras.layers import AveragePooling2D
+from keras.layers import Flatten
+from keras.layers import Dense
+from keras.models import Sequential
 
 
 def lenet():

@@ -34,6 +34,37 @@ from official.utils.misc import model_helpers
 from official.vision.image_classification import common
 from official.vision.image_classification import imagenet_preprocessing
 from official.vision.image_classification import alexnet_model
+from official.vision.image_classification import pss
+
+from keras.optimizers import adam_v2
+
+
+
+DATASET_DIR='/scratch1/09111/mbbm/100g_tfrecords'
+EPOCHS=2
+BATCH_SIZE=1024
+
+def dataset_fn(_):
+  is_training = True
+  data_dir = DATASET_DIR
+  num_epochs = EPOCHS
+  batch_size = BATCH_SIZE
+  dtype = tf.float32
+  shuffle_buffer = 10000
+
+  filenames = imagenet_preprocessing.get_shuffled_filenames(is_training, data_dir, num_epochs)
+  dataset = tf.data.Dataset.from_tensor_slices(filenames)
+
+  dataset = dataset.interleave(tf.data.TFRecordDataset, cycle_length=40, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+  dataset = dataset.shuffle(shuffle_buffer).repeat()
+  dataset = dataset.map(
+        lambda value: imagenet_preprocessing.parse_record(value, is_training, dtype),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  dataset = dataset.batch(batch_size, drop_remainder=False)
+  dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+
+  return dataset
 
 
 def run(flags_obj):
@@ -48,6 +79,11 @@ def run(flags_obj):
   Returns:
     Dictionary of training and eval stats.
   """
+
+  DATASET_DIR = flags_obj.data_dir
+  EPOCHS = flags_obj.train_epochs
+  BATCH_SIZE = flags_obj.batch_size
+
   keras_utils.set_session_config(
       enable_eager=flags_obj.enable_eager,
       enable_xla=flags_obj.enable_xla)
@@ -120,6 +156,7 @@ def run(flags_obj):
   # in the dataset, as XLA-GPU doesn't support dynamic shapes.
   drop_remainder = flags_obj.enable_xla
 
+ # """
   train_input_dataset = input_fn(
       is_training=True,
       data_dir=flags_obj.data_dir,
@@ -132,6 +169,9 @@ def run(flags_obj):
       tf_data_experimental_slack=flags_obj.tf_data_experimental_slack,
       training_dataset_cache=flags_obj.training_dataset_cache,
   )
+#"""
+
+  #train_input_dataset = tf.keras.utils.experimental.DatasetCreator(dataset_fn)
 
   eval_input_dataset = None
   if not flags_obj.skip_eval:
@@ -172,12 +212,13 @@ def run(flags_obj):
     else:
       model = alexnet_model.alexnet()
 
+    opt = adam_v2.Adam(learning_rate=lr_schedule, decay=lr_schedule/flags_obj.train_epochs)
     # TODO(b/138957587): Remove when force_v2_in_keras_compile is on longer
     # a valid arg for this model. Also remove as a valid flag.
     if flags_obj.force_v2_in_keras_compile is not None:
       model.compile(
           loss='sparse_categorical_crossentropy',
-          optimizer=optimizer,
+          optimizer=opt, #optimizer,
           metrics=(['sparse_categorical_accuracy']
                    if flags_obj.report_accuracy_metrics else None),
           run_eagerly=flags_obj.run_eagerly,
@@ -185,7 +226,7 @@ def run(flags_obj):
     else:
       model.compile(
           loss='sparse_categorical_crossentropy',
-          optimizer=optimizer,
+          optimizer=opt, #optimizer,
           metrics=(['sparse_categorical_accuracy']
                    if flags_obj.report_accuracy_metrics else None),
           run_eagerly=flags_obj.run_eagerly)
@@ -227,7 +268,10 @@ def run(flags_obj):
     no_dist_strat_device = tf.device('/device:GPU:0')
     no_dist_strat_device.__enter__()
 
+#  dataset_creator = tf.keras.utils.experimental.DatasetCreator(pss.dataset_fn)
+
   history = model.fit(train_input_dataset,
+                      #dataset_creator,
                       epochs=train_epochs,
                       steps_per_epoch=steps_per_epoch,
                       callbacks=callbacks,
