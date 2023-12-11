@@ -8,11 +8,18 @@
 #SBATCH -n 8                  # Total # of mpi tasks (should be 1 for serial)
 #SBATCH -t 00:30:00           # Run time (hh:mm:ss)
 
-remora ibrun -n 1 -o 0 ./job_tensorflow_distributed2.sh 0 &
-ibrun -n 1 -o 1 ./job_tensorflow_distributed2.sh 1 &
-ibrun -n 1 -o 2 ./job_tensorflow_distributed2.sh 2 &
-ibrun -n 1 -o 3 ./job_tensorflow_distributed2.sh 3 &
-ibrun -n 1 -o 4 ./job_tensorflow_distributed2.sh 4 &
-ibrun -n 1 -o 5 ./job_tensorflow_distributed2.sh 5 &
-ibrun -n 1 -o 6 ./job_tensorflow_distributed2.sh 6 &
-ibrun -n 1 -o 7 ./job_tensorflow_distributed2.sh 7
+#remora 
+ibrun -n 1 -o 0 ./job_tensorflow_distributed.sh 0 &
+ibrun -n 1 -o 1 ./job_tensorflow_distributed.sh 1 &
+ibrun -n 1 -o 2 ./job_tensorflow_distributed.sh 2 &
+ibrun -n 1 -o 3 ./job_tensorflow_distributed.sh 3 &
+ibrun -n 1 -o 4 ./job_tensorflow_distributed.sh 4 &
+ibrun -n 1 -o 5 ./job_tensorflow_distributed.sh 5 &
+# ibrun -n 1 -o 6 ./job_tensorflow_distributed2.sh 6 &
+# ibrun -n 1 -o 7 ./job_tensorflow_distributed2.sh 7
+
+sleep 140
+
+module load intel
+module load remora
+remora ../models/official-models-2.1.0/official/vision/image_classification/check_process_exits.sh "pss.py"

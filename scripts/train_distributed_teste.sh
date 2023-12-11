@@ -24,6 +24,7 @@ SHARD_SIZE=1024
 
 RESOURCES_DIR="${WORKSPACE}/scripts"
 
+#DIR="/scratch1/09111/mbbm/run_pss_md_unlimited_profiller"
 #OUTPUT=$(squeue --me -j $SLURM_JOBID | awk 'NR > 1 {print $8}')
 #WORKER_HOSTS=$(python3 split_nodelist_workers.py $OUTPUT | sed 's/ c/,c/g' | sed 's/ //g')
 
@@ -31,22 +32,26 @@ DISTRIBUTION_STRATEGY="parameter_server"
 
 #WORKER_HOSTS="c196-101:2222,c196-102:2222"
 WORKER_HOSTS=$(./get_test_ips_ps.sh)
+WRKS_ADDRS_AUX=$(./aux_monarch.sh)
 
-#echo "workers: $WORKER_HOSTS"
+echo "workers: $WORKER_HOSTS"
 
 ALL_REDUCE_ALG="ring"
 TASK_INDEX=0
 
 # Functions
 function export-vars {
+        export WRKS_ADDRS=${WRKS_ADDRS_AUX:30}
+        echo -e "Workers que correm DM: "
+        printenv WRKS_ADDRS
 	export PYTHONPATH=$PYTHONPATH:${WORKSPACE}/models/official-models-2.1.0
 }
 
 function monitor {
 	# Add monitoring code here (if needed)
-	return
+	#return
         #sh $RESOURCES_DIR/iostat-csv.sh > $RUN_DIR/iostat.csv &
-	#nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv -l 1 -f /tmp/nvidia-smi_${TASK_INDEX}.csv &
+	nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv -l 1 -f /tmp/nvidia-smi_${TASK_INDEX}.csv &
 	#if [[ ! -z $COLLECT_IOPS ]]; then
 	#	echo -e "entra COLLECT_IOPS"
 	#	$RESOURCES_DIR/collect_lustre_stats.sh -r 5 -o $RUN_DIR -s llite -f scratch1 > /dev/null &
@@ -54,6 +59,7 @@ function monitor {
 }
 
 function train-model {
+        export TASK_ID=${TASK_INDEX}
 	if [ "$MODEL" == "resnet" ]
 	then 
 		echo -e "Model: ResNet-50\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}" > $RUN_DIR/info.txt
@@ -62,36 +68,73 @@ function train-model {
 	then 
 		#echo -e "$DATASET_DIR\n"
 		echo -e "Model: AlexNet\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}"> $RUN_DIR/info.txt
-
+		
 		if [ "$DISTRIBUTION_STRATEGY" = "parameter_server" ]
 		then 
-			if [ $TASK_INDEX == 1 ]
+			if [ $TASK_INDEX == 0 ]
+                        then
+                                #python3.8 $SCRIPT_DIR/pss.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_$
+                                python3.8 $SCRIPT_DIR/pss.py $SKIP_EVAL --train_epochs=1 --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+
+
+                        elif [ $TASK_INDEX == 1 ]
 			then
 				sleep 70
+	                        #python3.8 $SCRIPT_DIR/pss.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+                                python3.8 $SCRIPT_DIR/pss.py $SKIP_EVAL --train_epochs=1 --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+
+
 			elif [ $TASK_INDEX > 1 ]
 			then
 				sleep 140
+				TASK_ID_AUX=TASK_INDEX
+                                export TASK_ID=$(( ${TASK_ID} - 2))
+				#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_tcp2/pastor/build/libmonarch.so  
+                                #LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_tcp/pastor/build/libmonarch.so 
+				#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_non_inhibiting/pastor/build/libmonarch.so 
+                                #LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_tcp/pastor/build/libmonarch.so 
+                                #LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_prefetching/pastor/build/libmonarch.so 
+				#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_ni_prefetching/pastor/build/libmonarch.so 
+                                #LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_int_ni/pastor/build/libmonarch.so 
+				#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/final_versions/monarch/pastor/build/libmonarch.so 
+				#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_int_ni/pastor/build/libmonarch.so 
+				#LD_PRELOAD=/home1/09111/mbbm/sdlprof/build/libprofiler.so 
+				#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_int_ni/pastor/build/libmonarch.so 
+				#LD_PRELOAD=/home1/09111/mbbm/sdlprof/build/libprofiler.so 
+
+                                #LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/final_versions/monarch/pastor/build_limited/libmonarch.so 
+				#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_map_lock2/pastor/build_teste/libmonarch.so 
+                                #nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv -l 1 -f /tmp/nvidia-smi_${TASK_INDEX}.csv &
+                                LD_PRELOAD=/home1/09111/mbbm/sdlprof/build/libprofiler.so python3.8 $SCRIPT_DIR/pss.py $SKIP_EVAL --train_epochs=1 --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+
 			fi
+						
+                        #export TASK_ID=${TASK_INDEX}
 
 			#$SCRIPT_DIR/pss_from_img.py
-			python3.8 $SCRIPT_DIR/pss.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+                        #$SCRIPT_DIR/pss_mnist.py
+			#$SCRIPT_DIR/pss_imagenet_img.py
+			#$SCRIPT_DIR/pss_open_images.py
+			#pss_sharding.py
+			#python3.8 $SCRIPT_DIR/pss.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
 
 		else 
+                        echo -e "multi-worker\n"
 			python3 $SCRIPT_DIR/alexnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
 		fi
 
 		#if [ $TASK_INDEX == 0 ]
 		#then
-		#	python3 $SCRIPT_DIR/chief.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log_${TASK_INDEX}.txt
+		#	python3.8 $SCRIPT_DIR/chief.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log_${TASK_INDEX}.txt
 		#elif [ $TASK_INDEX == 1 ]
 		#then
-		#	python3 $SCRIPT_DIR/ps.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+		#	python3.8 $SCRIPT_DIR/ps.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
 		#elif [ $TASK_INDEX == 2 ]
                 #then
-		#	python3 $SCRIPT_DIR/w1.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+		#	python3.8 $SCRIPT_DIR/w1.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
 		#elif [ $TASK_INDEX == 3 ]
                 #then
-		#	python3 $SCRIPT_DIR/w2.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+		#	python3.8 $SCRIPT_DIR/w2.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
 		#fi
 
 	elif [ "$MODEL" == "lenet" ]
@@ -307,8 +350,14 @@ sleep 10
 # Start training the model
 SECONDS=0
 #LD_PRELOAD=/home1/09111/mbbm/sdlprof/build/libprofiler.so train-model
-#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch/pastor/build/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch/pastor/build2/libmonarch.so train-model
+
 train-model
+
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/DistributedMonarch/pastor/build/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch/pastor/build/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch2/pastor/build/libmonarch.so train-model
+
 echo "ELAPSED TIME: $SECONDS s" | tee -a $RUN_DIR/log.txt 
 sleep 10
 

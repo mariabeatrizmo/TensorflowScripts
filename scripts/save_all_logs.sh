@@ -11,10 +11,10 @@
 ibrun -n 1 -o 0 ./save_logs_profiler.sh &
 ibrun -n 1 -o 1 ./save_logs_profiler.sh &
 ibrun -n 1 -o 2 ./save_logs_profiler.sh &
-ibrun -n 1 -o 3 ./save_logs_profiler.sh #&
-#ibrun -n 1 -o 4 ./save_logs_profiler.sh &
-#ibrun -n 1 -o 5 ./save_logs_profiler.sh #&
+ibrun -n 1 -o 3 ./save_logs_profiler.sh &
+ibrun -n 1 -o 4 ./save_logs_profiler.sh &
+ibrun -n 1 -o 5 ./save_logs_profiler.sh #&
 #ibrun -n 1 -o 6 ./save_logs_profiler.sh &
-#ibrun -n 1 -o 7 ./save_logs_profiler.sh #&
+#ibrun -n 1 -o 7 ./save_logs_profiler.sh &
 #ibrun -n 1 -o 8 ./save_logs_profiler.sh &
 #ibrun -n 1 -o 9 ./save_logs_profiler.sh

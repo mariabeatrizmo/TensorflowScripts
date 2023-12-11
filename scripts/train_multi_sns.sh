@@ -5,9 +5,8 @@
 WORKSPACE=$(dirname $(dirname $(realpath $0)))
 SCRIPT_DIR="${WORKSPACE}/models/official-models-2.1.0/official/vision/image_classification"
 VENV_DIR="${HOME}/tensorflow-venv"
-CHECKPOINTING_DIR="/tmp/checkpointing"
+CHECKPOINTING_DIR="/tmp/checkpointing0"
 # ======================================================================================
-RESOURCES_DIR="${WORKSPACE}/scripts"
 
 # Default values
 DATASET_DIR=""
@@ -23,8 +22,27 @@ LUSTRE_TRAIN_SIZE=2946634
 SKIP_EVAL=""
 SHARD_SIZE=1024
 
+RESOURCES_DIR="${WORKSPACE}/scripts"
+
+#OUTPUT=$(squeue --me -j $SLURM_JOBID | awk 'NR > 1 {print $8}')
+#WORKER_HOSTS=$(python3 split_nodelist_workers.py $OUTPUT | sed 's/ c/,c/g' | sed 's/ //g')
+
+DISTRIBUTION_STRATEGY="parameter_server"
+
+#WORKER_HOSTS="c196-101:2222,c196-102:2222"
+WORKER_HOSTS=$(./get_test_ips_ps.sh)
+WRKS_ADDRS_AUX=$(./aux_monarch.sh)
+
+echo "workers: $WORKER_HOSTS"
+
+ALL_REDUCE_ALG="ring"
+TASK_INDEX=0
+
 # Functions
 function export-vars {
+        export WRKS_ADDRS=${WRKS_ADDRS_AUX}
+        echo -e "Workers que correm DM: "
+        printenv WRKS_ADDRS
 	export PYTHONPATH=$PYTHONPATH:${WORKSPACE}/models/official-models-2.1.0
 }
 
@@ -32,26 +50,81 @@ function monitor {
 	# Add monitoring code here (if needed)
 	return
         #sh $RESOURCES_DIR/iostat-csv.sh > $RUN_DIR/iostat.csv &
-        #nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv -l 1 -f $RUN_DIR/nvidia-smi.csv# &
-        #if [[ ! -z $COLLECT_IOPS ]]; then
-        #       $RESOURCES_DIR/collect_lustre_stats.sh -r 5 -o $RUN_DIR -s llite -f scratch1 > /dev/null &
-        #fi
+	#nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv -l 1 -f /tmp/nvidia-smi_${TASK_INDEX}.csv &
+	#if [[ ! -z $COLLECT_IOPS ]]; then
+	#	echo -e "entra COLLECT_IOPS"
+	#	$RESOURCES_DIR/collect_lustre_stats.sh -r 5 -o $RUN_DIR -s llite -f scratch1 > /dev/null &
+	#fi
 }
 
 function train-model {
+        export TASK_ID=${TASK_INDEX}
 	if [ "$MODEL" == "resnet" ]
 	then 
 		echo -e "Model: ResNet-50\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}" > $RUN_DIR/info.txt
-		python3 $SCRIPT_DIR/resnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+		python3 $SCRIPT_DIR/resnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
 	elif [ "$MODEL" == "alexnet" ]
 	then 
+		#echo -e "$DATASET_DIR\n"
 		echo -e "Model: AlexNet\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}"> $RUN_DIR/info.txt
-		timeout 1h python3.8 $SCRIPT_DIR/alexnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+
+		if [ "$DISTRIBUTION_STRATEGY" = "parameter_server" ]
+		then 
+			if [ $TASK_INDEX == 0 ]
+                        then
+                                python3.8 $SCRIPT_DIR/sns_vgg19.py $SKIP_EVAL --train_epochs=2 --batch_size=512 --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+
+
+                        elif [ $TASK_INDEX == 1 ]
+			then
+				sleep 100
+				python3.8 $SCRIPT_DIR/sns_inceptionv3.py $SKIP_EVAL --train_epochs=4 --batch_size=512 --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+
+			elif [ $TASK_INDEX == 2 ]
+                        then
+				sleep 200
+				python3.8 $SCRIPT_DIR/sns_shufflenet.py $SKIP_EVAL --train_epochs=8 --batch_size=512 --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+
+			elif [ $TASK_INDEX == 3 ]
+                        then
+				sleep 300
+				python3.8 $SCRIPT_DIR/sns_resnet18.py $SKIP_EVAL --train_epochs=10 --batch_size=512 --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+
+			elif  [ $TASK_INDEX == 4 ]
+                        then
+				sleep 400
+                                python3.8 $SCRIPT_DIR/sns_alexnet.py $SKIP_EVAL --train_epochs=20 --batch_size=512 --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+			
+			elif [ $TASK_INDEX == 5 ]
+                        then
+				sleep 500
+                                python3.8 $SCRIPT_DIR/sns_lenet.py $SKIP_EVAL --train_epochs=20 --batch_size=512 --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+			fi
+
+		else 
+                        echo -e "multi-worker\n"
+			python3 $SCRIPT_DIR/alexnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+		fi
+
+		#if [ $TASK_INDEX == 0 ]
+		#then
+		#	python3.8 $SCRIPT_DIR/chief.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log_${TASK_INDEX}.txt
+		#elif [ $TASK_INDEX == 1 ]
+		#then
+		#	python3.8 $SCRIPT_DIR/ps.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+		#elif [ $TASK_INDEX == 2 ]
+                #then
+		#	python3.8 $SCRIPT_DIR/w1.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+		#elif [ $TASK_INDEX == 3 ]
+                #then
+		#	python3.8 $SCRIPT_DIR/w2.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+		#fi
+
 	elif [ "$MODEL" == "lenet" ]
 	then 
 		echo -e "Model: LeNet\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}"> $RUN_DIR/info.txt
-		python3.8 $SCRIPT_DIR/lenet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
-		echo -e "Finish exec"
+		timeout 1h python3 $SCRIPT_DIR/lenet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
+		#python3 $SCRIPT_DIR/lenet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS  --distribution_strategy=$DISTRIBUTION_STRATEGY  --worker_hosts="c197-042:2222" --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log.txt
 	else
 		echo "Select a valid model. Run train-model -h to see the available models"
 	fi
@@ -60,8 +133,8 @@ function train-model {
 function kill-monitor {
 	echo -e "\nKilling jobs: \n$(jobs -p)"
 	kill $(jobs -p)
-        #echo -e $(pgrep iostat)
-        #kill $(pgrep iostat)
+	#echo -e $(pgrep iostat)
+	#kill $(pgrep iostat)
 }
 
 function update-prefetch {
@@ -135,7 +208,7 @@ export-vars
 
 # Handle flags
 echo -e "\nHandling flags..."
-while getopts ":holfvm:b:d:e:g:r:i:s:c:" opt; do
+while getopts ":holfvm:b:d:e:g:r:i:s:c:t:w:a:j:" opt; do
 	case $opt in
 		h)
 			echo "$package - train Tensorflow models on ImageNet dataset"
@@ -155,6 +228,11 @@ while getopts ":holfvm:b:d:e:g:r:i:s:c:" opt; do
 			echo "-c       use TF caching and specify caching location (mem or file path)"
 			echo "-v       skip evaluation"
 			echo "-s       shard size"
+			echo "-t       distribution strategy"
+			echo "-w       worker hosts addresses"
+			echo "-a       all_reduce_alg (ex. ring)"
+			echo "-j       task index for distributed setup"
+			echo "-o       collect lustre IOPS"
 			exit 0
 			;;
 		m)
@@ -205,6 +283,27 @@ while getopts ":holfvm:b:d:e:g:r:i:s:c:" opt; do
 			echo "-s was triggered, shard size: $OPTARG" >&2
 			SHARD_SIZE=$OPTARG
 			;;
+                t)
+                        echo "-t was triggered, distribution strategy: $OPTARG" >&2
+                        DISTRIBUTION_STRATEGY=$OPTARG
+                        ;;
+                w)
+                        echo "-w was triggered, worker hosts adresses: $OPTARG" >&2
+                        WORKER_HOSTS=$OPTARG
+                        ;;
+                a)
+                        echo "-a was triggered, all_reduce_alg: $OPTARG" >&2
+                        ALL_REDUCE_ALG=$OPTARG
+                        ;;
+                j)
+                        echo "-j was triggered, Task index: $OPTARG" >&2
+                        TASK_INDEX=$OPTARG
+                        ;;
+		o)
+			echo "-o was triggered, collect lustre IOPS is enable" >&2
+			COLLECT_IOPS=true
+			#COLLECT_IOPS=false
+			;;
 		\?)
 			echo "Invalid option: -$OPTARG" >&2
 			exit 1
@@ -233,10 +332,15 @@ sleep 10
 
 # Start training the model
 SECONDS=0
-#LD_PRELOAD=/home1/09111/mbbm/monarch/monarch/pastor/build/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/sdlprof/build/libprofiler.so train-model
 #LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch/pastor/build2/libmonarch.so train-model
-LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch/pastor/build/libmonarch.so train-model
-#train-model
+
+train-model
+
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/DistributedMonarch/pastor/build/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch/pastor/build/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch2/pastor/build/libmonarch.so train-model
+
 echo "ELAPSED TIME: $SECONDS s" | tee -a $RUN_DIR/log.txt 
 sleep 10
 

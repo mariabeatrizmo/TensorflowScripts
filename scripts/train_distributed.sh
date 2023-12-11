@@ -23,6 +23,7 @@ SKIP_EVAL=""
 SHARD_SIZE=1024
 
 RESOURCES_DIR="${WORKSPACE}/scripts"
+DIR="/scratch1/09111/mbbm/run_mws_monarch_limited_profiller/"
 
 #OUTPUT=$(squeue --me -j $SLURM_JOBID | awk 'NR > 1 {print $8}')
 
@@ -42,6 +43,7 @@ DISTRIBUTION_STRATEGY="multi_worker_mirrored"
 #WORKER_HOSTS="c196-102:2222,c196-111:2222"
 #WORKER_HOSTS="c197-091:2222,c197-092:2222,c197-101:2222,c197-102:2222"
 WORKER_HOSTS=$(./get_test_ips.sh)
+WRKS_ADDRS_AUX=$(./aux_monarch.sh)
 
 echo "workers: $WORKER_HOSTS"
 
@@ -51,6 +53,8 @@ TASK_INDEX=0
 
 # Functions
 function export-vars {
+        export WRKS_ADDRS=${WRKS_ADDRS_AUX}
+        printenv WRKS_ADDRS
 	export PYTHONPATH=$PYTHONPATH:${WORKSPACE}/models/official-models-2.1.0
 }
 
@@ -73,7 +77,22 @@ function train-model {
 	elif [ "$MODEL" == "alexnet" ]
 	then 
 		echo -e "Model: AlexNet\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}"> $RUN_DIR/info.txt
-		timeout 1h python3.8 $SCRIPT_DIR/alexnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log_${TASK_INDEX}.txt
+		# timeout 1h 
+                export TASK_ID=${TASK_INDEX}
+		# LD_PRELOAD=/home1/09111/mbbm/sdlprof/build/libprofiler.so
+		# LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_map_lock2/pastor/build_teste/libmonarch.so
+                # LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/final_versions/monarch/pastor/build_limited/libmonarch.so
+		#nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv -l 1 -f /tmp/nvidia-smi_${TASK_INDEX}.csv &
+                LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/final_versions/monarch/pastor/build_limited/libmonarch.so timeout 90m python3.8 $SCRIPT_DIR/mws.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log_${TASK_INDEX}.txt
+
+		#mkdir $DIR
+                #mv /tmp/log_* $DIR
+                #mv /tmp/alexnet-100g-bs* $DIR
+                #mv /tmp/middleware_output/debugger/run-0-c* $DIR
+                #mv /home1/09111/mbbm/tensorflow_scripts/scripts/remora_* $DIR
+                #mv /tmp/nvidia-smi_* $DIR
+                
+		#python3.8 $SCRIPT_DIR/alexnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS --distribution_strategy=$DISTRIBUTION_STRATEGY --worker_hosts=$WORKER_HOSTS --all_reduce_alg=$ALL_REDUCE_ALG --task_index=$TASK_INDEX |& tee $RUN_DIR/log_${TASK_INDEX}.txt
 	elif [ "$MODEL" == "lenet" ]
 	then 
 		echo -e "Model: LeNet\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}"> $RUN_DIR/info.txt
@@ -287,7 +306,9 @@ sleep 10
 # Start training the model
 SECONDS=0
 #LD_PRELOAD=/home1/09111/mbbm/sdlprof/build/libprofiler.so train-model
-#LD_PRELOAD=/home1/09111/mbbm/monarch/pastor/build/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch/pastor/build2/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_tcp_non_inhibiting/pastor/build/libmonarch.so train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch_int_ni/pastor/build/libmonarch.so 
 train-model
 echo "ELAPSED TIME: $SECONDS s" | tee -a $RUN_DIR/log.txt 
 sleep 10

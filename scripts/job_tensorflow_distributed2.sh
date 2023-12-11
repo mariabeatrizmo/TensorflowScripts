@@ -6,6 +6,11 @@ DATA_DIR="/scratch1/09111/mbbm"
 #echo -e "cp 100g_tfrecords to /tmp"
 #cp -r /scratch1/09111/mbbm/100g_tfrecords/ /tmp/100g_tfrecords/
 
+rm -r /tmp/500g_tfrecords
+rm -r /tmp/alexnet-100g-bs*
+cp /scratch1/09111/mbbm/lixo_60.txt /dev/shm
+python3.8 ~/creator.py
+
 #rsync -av /scratch1/09111/mbbm/100g_tfrecords/ /tmp/100g_tfrecords/
 #rsync -av /scratch1/09111/mbbm/60g_tfrecords/ /tmp/60g_tfrecords/
 #rsync -av /scratch1/09111/mbbm/60g_tfrecords/ /dev/shm/60g_tfrecords/
@@ -14,8 +19,8 @@ DATA_DIR="/scratch1/09111/mbbm"
 
 cd "${WORKSPACE}/scripts"
 
-EPOCHS=1
-BATCH_SIZE=1024
+EPOCHS=100
+BATCH_SIZE=512
 DATE="$(date +%Y_%m_%d-%H_%M)"
 TARGET_DIR="/tmp"
 TASK_INDEX=$1
@@ -25,10 +30,12 @@ echo "module load cuda/10.1 cudnn/7.6.5 nccl/2.5.6"
 #module load cudnn/7.6.5
 #module load nccl/2.5.6
 module load cuda/11.3 cudnn nccl
+module load gcc
 
 # 100g
-DATASET="${DATA_DIR}/100g_tfrecords"
+#DATASET="${DATA_DIR}/100g_tfrecords"
 #DATASET="${DATA_DIR}/60g_tfrecords"
+DATASET="/scratch1/09111/mbbm/open_images/tfrecords/train"
  
 for i in {1..1}; do
   RUN_DIR="${TARGET_DIR}/alexnet-100g-bs${BATCH_SIZE}-ep${EPOCHS}-${DATE}"

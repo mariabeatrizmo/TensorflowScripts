@@ -39,22 +39,13 @@ function monitor {
 }
 
 function train-model {
-	if [ "$MODEL" == "resnet" ]
-	then 
-		echo -e "Model: ResNet-50\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}" > $RUN_DIR/info.txt
-		python3 $SCRIPT_DIR/resnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
-	elif [ "$MODEL" == "alexnet" ]
-	then 
-		echo -e "Model: AlexNet\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}"> $RUN_DIR/info.txt
-		timeout 1h python3.8 $SCRIPT_DIR/alexnet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
-	elif [ "$MODEL" == "lenet" ]
-	then 
-		echo -e "Model: LeNet\nDataset: ImageNet\nBatch size: $BATCH_SIZE\nEpochs: $EPOCHS\nShuffle Buffer: $SHUFFLE_BUFFER\nGPUs: $NUM_GPUS\nFramework: Tensorflow \nDataset:${DATASET_DIR}"> $RUN_DIR/info.txt
-		python3.8 $SCRIPT_DIR/lenet_imagenet_main.py $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
-		echo -e "Finish exec"
-	else
-		echo "Select a valid model. Run train-model -h to see the available models"
-	fi
+	#python3.8 -c "from absl import app;from absl import flags;FLAGS = flags.FLAGS; flags.DEFINE_string('model','alexnet'); flags.DEFINE_string('optimizer','adam')"
+        #single_node.py
+        #echo -e "Python script \n\n\n\"
+	#python3.8 $SCRIPT_DIR/sns_inceptionv3.py  $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+        #python3.8 $SCRIPT_DIR/sns_resnet18.py  $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+        LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/final_versions/monarch/pastor/build/libmonarch.so  python3.8 $SCRIPT_DIR/sns_vgg19.py  $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
+        #python3.8 $SCRIPT_DIR/sns_lenet.py  $SKIP_EVAL --train_epochs=$EPOCHS --batch_size=$BATCH_SIZE --model_dir=$CHECKPOINTING_DIR --data_dir=$DATASET_DIR --num_gpus=$NUM_GPUS |& tee $RUN_DIR/log.txt
 }
 
 function kill-monitor {
@@ -234,9 +225,8 @@ sleep 10
 # Start training the model
 SECONDS=0
 #LD_PRELOAD=/home1/09111/mbbm/monarch/monarch/pastor/build/libmonarch.so train-model
-#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch/pastor/build2/libmonarch.so train-model
-LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch/pastor/build/libmonarch.so train-model
-#train-model
+#LD_PRELOAD=/home1/09111/mbbm/tensorflow_scripts/scripts/monarch2/monarch/pastor/build/libmonarch.so train-model
+train-model
 echo "ELAPSED TIME: $SECONDS s" | tee -a $RUN_DIR/log.txt 
 sleep 10
 

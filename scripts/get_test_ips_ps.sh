@@ -15,8 +15,8 @@ ibrun -n 1 -o 0 python3 ip_finder.py > ${FILE_NAME}
 ibrun -n 1 -o 1 python3 ip_finder.py >> ${FILE_NAME}
 ibrun -n 1 -o 2 python3 ip_finder.py >> ${FILE_NAME}
 ibrun -n 1 -o 3 python3 ip_finder.py >> ${FILE_NAME}
-#ibrun -n 1 -o 4 python3 ip_finder.py >> ${FILE_NAME}
-#ibrun -n 1 -o 5 python3 ip_finder.py >> ${FILE_NAME}
+ibrun -n 1 -o 4 python3 ip_finder.py >> ${FILE_NAME}
+ibrun -n 1 -o 5 python3 ip_finder.py >> ${FILE_NAME}
 #ibrun -n 1 -o 6 python3 ip_finder.py >> ${FILE_NAME}
 #ibrun -n 1 -o 7 python3 ip_finder.py >> ${FILE_NAME}
 #ibrun -n 1 -o 8 python3 ip_finder.py >> ${FILE_NAME}

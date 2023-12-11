@@ -1,3 +1,4 @@
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -17,22 +18,27 @@ from official.utils.misc import distribution_utils
 from official.utils.misc import keras_utils
 from official.utils.misc import model_helpers
 from official.vision.image_classification import common
-from official.vision.image_classification import imagenet_preprocessing
+from official.vision.image_classification import imagenet_preprocessing   #2 as imagenet_preprocessing
 from official.vision.image_classification import alexnet_model
 from official.vision.image_classification import lenet_model
 from official.vision.image_classification import resnet_model
 from official.vision.image_classification import inception_v4_model
-from official.vision.image_classification import resnet18_model_2
+from official.vision.image_classification import shufflenet_model
 from keras.optimizers import adam_v2
 from tensorflow.keras.layers import Input
+from keras_resnet import models as resnet_models
+from official.vision.image_classification import resnet18_model
+from official.vision.image_classification import resnet18_model_2
 
 DATASET_DIR='/scratch1/09111/mbbm/100g_tfrecords'
 EPOCHS=2
 BATCH_SIZE=1024
+TASK_ID=4
+NUM_WORKERS=4
 
 
 def dataset_fn(input_context):
-  global DATASET_DIR, EPOCHS, BATCH_SIZE
+  global DATASET_DIR, EPOCHS, BATCH_SIZE, TASK_ID, NUM_WORKERS
   is_training = True
   data_dir = DATASET_DIR
   num_epochs = EPOCHS
@@ -52,6 +58,7 @@ def dataset_fn(input_context):
         lambda value: imagenet_preprocessing.parse_record(value, is_training, dtype),
         num_parallel_calls=tf.data.experimental.AUTOTUNE)
   dataset = dataset.batch(batch_size, drop_remainder=False)
+  #dataset = dataset.shuffle(shuffle_buffer).repeat()
   dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
   #dist_dataset = parameter_server.experimental_distribute_dataset(dataset)
@@ -59,106 +66,43 @@ def dataset_fn(input_context):
   #options = tf.data.Options()
   #options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
   #dataset = dataset.with_options(options)
-  
+
+  #ic = tf.distribute.InputContext(
+  #  num_input_pipelines=NUM_WORKERS, input_pipeline_id=TASK_ID
+  #)
+
+  #print("INPUT_CONTEXT")
+  #print(ic.num_input_pipelines)
+  #print(ic.input_pipeline_id)
+
   dataset = dataset.shard(
     input_context.num_input_pipelines, input_context.input_pipeline_id)
+  #  ic.num_input_pipelines, ic.input_pipeline_id)
 
   return dataset
 
-def get_distribution_strategy(distribution_strategy="parameter_server",
-                              num_gpus=0):
-  if distribution_strategy == "parameter_server":
-    cluster_resolver = tf.distribute.cluster_resolver.TFConfigClusterResolver()
-    print("parameterserver")
-    if cluster_resolver.task_type in ("worker", "ps"):
-      # Start a TensorFlow server and wait.
-      os.environ["GRPC_FAIL_FAST"] = "use_caller"
-
-      server = tf.distribute.Server(
-          cluster_resolver.cluster_spec(),
-          job_name=cluster_resolver.task_type,
-          task_index=cluster_resolver.task_id,
-          protocol=cluster_resolver.rpc_layer or "grpc",
-          start=True)
-      server.join()
-   
-    #NUM_PS=1
-    #variable_partitioner = (
-    #    tf.distribute.experimental.partitioners.MinSizePartitioner(
-    #    min_shard_bytes=(256 << 10),
-    #    max_shards=NUM_PS))
-
-    return tf.distribute.experimental.ParameterServerStrategy(cluster_resolver) #, 
-#      variable_partitioner=None)
-
-def configure_cluster(worker_hosts=None, task_index=-1, distribution_strategy="parameter_server"):
-  """Set multi-worker cluster spec in TF_CONFIG environment variable.
-  Args:
-    worker_hosts: comma-separated list of worker ip:port pairs.
-  Returns:
-    Number of workers in the cluster.
-  """
-  tf_config = json.loads(os.environ.get('TF_CONFIG', '{}'))
-  if tf_config:
-    num_workers = (len(tf_config['cluster'].get('chief', [])) +
-                   len(tf_config['cluster'].get('ps', [])) +
-                   len(tf_config['cluster'].get('worker', [])))
-  elif worker_hosts:
-    workers = worker_hosts.split(',')
-    num_workers = len(workers)
-    if num_workers > 1 and task_index < 0:
-      raise ValueError('Must specify task_index when number of workers > 1')
-    if distribution_strategy=="parameter_server":
-      if num_workers < 3:
-            raise ValueError('Must have at least a chief, a worker and a ps.')
-      else:
-            if task_index is 0:
-                  worker_type = "chief"
-            elif task_index is 1:
-                  worker_type = "ps"
-                  task_index -= 1
-            else:
-                  worker_type = "worker"
-                  task_index-=2
-
-            os.environ["TF_CONFIG"] = json.dumps({
-                  "cluster": {
-                        "worker": workers[2:],
-                        "ps": [workers[1]],
-                        "chief": [workers[0]]
-                  },
-                  "task": {"type": worker_type, "index": task_index}
-            })
-    else:
-      task_index = 0 if num_workers == 1 else task_index
-      os.environ['TF_CONFIG'] = json.dumps({
-            'cluster': {
-                  'worker': workers
-            },
-            'task': {'type': 'worker', 'index': task_index}
-      })
-  else:
-    num_workers = 1
-  return num_workers
 
 def run(flags_obj):
-  global DATASET_DIR, EPOCHS, BATCH_SIZE
+  global DATASET_DIR, EPOCHS, BATCH_SIZE, TASK_ID, NUM_WORKERS
   DATASET_DIR = flags_obj.data_dir
   EPOCHS = flags_obj.train_epochs
   BATCH_SIZE = flags_obj.batch_size
+  TASK_ID = flags_obj.task_index
   
-  configure_cluster(flags_obj.worker_hosts,
-                    flags_obj.task_index,
-                    distribution_strategy=flags_obj.distribution_strategy)
+  NUM_WORKERS = distribution_utils.configure_cluster(flags_obj.worker_hosts,
+                                                     flags_obj.task_index)
+  strategy = distribution_utils.get_distribution_strategy(
+      distribution_strategy=flags_obj.distribution_strategy,
+      num_gpus=flags_obj.num_gpus,
+      num_workers=NUM_WORKERS,
+      all_reduce_alg=flags_obj.all_reduce_alg,
+      num_packs=flags_obj.num_packs,
+      tpu_address=flags_obj.tpu)
+  print("Cluster initialized")
 
   lr_schedule = 0.1
-
-  strategy = get_distribution_strategy(
-      distribution_strategy=flags_obj.distribution_strategy,
-      num_gpus=flags_obj.num_gpus)
-  
   with strategy.scope():
-    #model = alexnet_model.alexnet()
+    model = alexnet_model.alexnet()
     #model = lenet_model.lenet()
     #model = resnet_model.resnet50(
     #      num_classes=imagenet_preprocessing.NUM_CLASSES)
@@ -169,19 +113,24 @@ def run(flags_obj):
     #model = tf.keras.applications.InceptionV3(
     #model = tf.keras.applications.resnet.ResNet152(
     #model = tf.keras.applications.ResNet50V2(
-#    model = tf.keras.applications.InceptionV3(
+    #model = tf.keras.applications.InceptionV3(
 #	#include_top=False,
 #        weights=None,
 #        input_tensor=Input(shape=(224, 224, 3)),
 #	classes=imagenet_preprocessing.NUM_CLASSES
 #    )
 
+    #model = shufflenet_model.ShuffleNetV2(include_top=True, input_shape=(224, 224, 3), load_model=None, classes=imagenet_preprocessing.NUM_CLASSES)
+
+    #model = resnet_models.ResNet18(include_top=False, inputs=Input(shape=(224, 224, 3)),  classes=imagenet_preprocessing.NUM_CLASSES)
+    #model = resnet18_model.ResNet18(input_shape=Input(shape=(224, 224, 3)), classes=imagenet_preprocessing.NUM_CLASSES)
+
+    #model = resnet18_model_2.ImageNetRN18()
+
 #    model = inception_v4_model.create_model(
 #	include_top=False,
 #	num_classes=imagenet_preprocessing.NUM_CLASSES,
 #        weights=None)
-
-    model = resnet18_model_2.ImageNetRN18()
 
     optimizer = adam_v2.Adam(learning_rate=lr_schedule, decay=lr_schedule/flags_obj.train_epochs)
     #optimizer = tf.keras.optimizers.legacy.SGD()
@@ -195,8 +144,22 @@ def run(flags_obj):
   
 
   steps_per_epoch=imagenet_preprocessing.NUM_IMAGES['train'] // flags_obj.batch_size
-  dataset_creator = tf.keras.utils.experimental.DatasetCreator(dataset_fn)
-  model.fit(dataset_creator, epochs=flags_obj.train_epochs, steps_per_epoch=steps_per_epoch)
+  dataset = tf.keras.utils.experimental.DatasetCreator(dataset_fn)
+
+  dataset = imagenet_preprocessing.input_fn(
+      is_training=True,
+      data_dir=flags_obj.data_dir,
+      batch_size=flags_obj.batch_size,
+      num_epochs=flags_obj.train_epochs,
+      parse_record_fn=imagenet_preprocessing.parse_record,
+      datasets_num_private_threads=flags_obj.datasets_num_private_threads,
+      dtype=tf.float16,
+      drop_remainder=flags_obj.enable_xla,
+      tf_data_experimental_slack=flags_obj.tf_data_experimental_slack,
+      training_dataset_cache=flags_obj.training_dataset_cache,
+  )
+
+  model.fit(dataset, epochs=flags_obj.train_epochs, steps_per_epoch=steps_per_epoch, verbose=2)
 
   return 
 
